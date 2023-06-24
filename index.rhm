@@ -1,0 +1,106 @@
+#lang rhombus
+
+import:
+  lib("racket/base.rkt"):
+    rename:
+      #{list->vector} as list_to_vector
+      #{vector->immutable-vector} as vector_to_immutable
+    only:
+      list_to_vector
+      vector_to_immutable
+    open
+  lib("racket/unsafe/ops.rkt"):
+    rename #{unsafe-vector*->immutable-vector!} as unsafe_vector_to_immutable
+    only unsafe_vector_to_immutable
+    open
+  lib("racket/sequence.rkt")
+
+class IndexExn():
+  extends Exn.Fail
+  export raise_out_of_bounds
+
+  fun raise_out_of_bounds(who, i, size):
+    throw IndexExn(who +& ": index is out of bounds:\n" ++ \
+                     "  index-size: " +& size  ++ "\n" ++ \
+                     "  position: "   +& i,
+                   Continuation.current_marks())
+
+interface Index:
+  property sort :~ Symbol  
+  method lookup(i)
+  method indices() :~ Sequence  
+  method compose(j :~ Index) :~ Index
+
+  method size() :~ NonnegInt:
+    sequence.#{sequence-length}(indices())
+  
+class IdentityIndex(~size: _size :: NonnegInt):
+  implements: Index
+  internal _IdentityIndex
+
+  override property sort: #'integer
+
+  override lookup(i :: Int) :~ Int:
+    unless i <= _size
+    | IndexExn.raise_out_of_bounds(#'lookup, i, _size)    
+    i
+
+  override indices() :~ Sequence:
+    0 .. _size
+
+  override size() :~ NonnegInt:
+    _size
+
+  override compose(j :: Index) :: Index:    
+    unless j.sort == #'integer
+    | throw IndexExn("cannot compose non #'integer sort index with " ++ \
+                     "identity index",
+                     Continuation.current_marks())
+    match j
+    | j :: _IdentityIndex:
+        cond
+        | j.size() == _size: this
+        | j.size() < _size: j
+        | ~else:
+            throw IndexExn("cannot compose IdentityIndex with larger Index",
+                           Continuation.current_marks())
+    | ~else:
+        let v:
+          for Array:
+            each idx: indices()
+            j.lookup(idx)
+        let v = unsafe_vector_to_immutable(v)
+        ArrayIndex(~store: v)
+
+
+class ArrayIndex(~store: store :: ImmutableArray && Array.of(Int)):
+  implements Index
+
+  override property sort: #'integer
+
+  constructor (~store: s):
+    match s
+    | s :: Array.of(Int):
+        super(~store: vector_to_immutable(s))
+    | s:: List.of(Int):
+        let iv = unsafe_vector_to_immutable(list_to_vector(s))
+        super(~store: iv)
+
+  override lookup(i :: Int) :~ Int:
+    unless i <= size()
+    | IndexExn.raise_out_of_bounds(#'lookup, i, size())
+    store[i]
+
+  override indices() :~ Sequence:
+    store
+
+  override size() :~ NonnegInt:
+    store.length()
+
+  override compose(j :: Index) :: Index:
+    let v:
+      for Array:
+        each idx: store
+        j.lookup(idx)
+    let v = unsafe_vector_to_immutable(v)
+    ArrayIndex(~store: v)
