@@ -1,0 +1,20 @@
+#lang rhombus
+
+import:
+  lib("racket/base.rkt"):
+    rename:
+      #{list->vector} as list_to_vector
+      #{vector->immutable-vector} as vector_to_immutable
+    only:
+      list_to_vector
+      vector_to_immutable
+    open
+  lib("racket/unsafe/ops.rkt"):
+    rename #{unsafe-vector*->immutable-vector!} as unsafe_vector_to_immutable
+    only unsafe_vector_to_immutable
+    open
+
+export:
+  list_to_vector
+  vector_to_immutable
+  unsafe_vector_to_immutable

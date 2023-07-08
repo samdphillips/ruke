@@ -1,0 +1,33 @@
+#lang rhombus/static/and_meta
+
+import:
+  "index.rhm" open
+  "util.rhm" open
+
+export:
+  Series
+
+class Series(~name: name :: Symbol,
+             ~index: index :: Index,
+             ~store: store :: ImmutableArray):
+  implements: Indexable
+
+  constructor(~name: name :: Symbol,
+              ~store: store :: Array,
+              ~index: index :: Index
+                        = IdentityIndex(~size: store.length())):
+    let s:
+      match store
+      | _ :: ImmutableArray: store
+      | _: vector_to_immutable(store)
+    super(~name: name, ~index: index, ~store: s)
+
+  override get(i):
+    store[index[i]]
+
+  method push_index(index :: Index) :~ Series:
+    Series(~name: name,
+           ~index: index.compose(this.index),
+           ~store: store)    
+
+                    

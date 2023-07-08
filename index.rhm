@@ -1,19 +1,14 @@
-#lang rhombus
+#lang rhombus/static
 
 import:
-  lib("racket/base.rkt"):
-    rename:
-      #{list->vector} as list_to_vector
-      #{vector->immutable-vector} as vector_to_immutable
-    only:
-      list_to_vector
-      vector_to_immutable
-    open
-  lib("racket/unsafe/ops.rkt"):
-    rename #{unsafe-vector*->immutable-vector!} as unsafe_vector_to_immutable
-    only unsafe_vector_to_immutable
-    open
   lib("racket/sequence.rkt")
+  "util.rhm" open
+
+export:
+  Index
+  IndexExn
+  IdentityIndex
+  ArrayIndex
 
 class IndexExn():
   extends Exn.Fail
@@ -26,6 +21,7 @@ class IndexExn():
                    Continuation.current_marks())
 
 interface Index:
+  extends Indexable
   property sort :~ Symbol  
   method lookup(i)
   method indices() :~ Sequence  
@@ -33,6 +29,8 @@ interface Index:
 
   method size() :~ NonnegInt:
     sequence.#{sequence-length}(indices())
+
+  final override get(i): lookup(i)
   
 class IdentityIndex(~size: _size :: NonnegInt):
   implements: Index
@@ -67,8 +65,8 @@ class IdentityIndex(~size: _size :: NonnegInt):
     | ~else:
         let v:
           for Array:
-            each idx: indices()
-            j.lookup(idx)
+            each i: 0 .. _size
+            j.lookup(i)
         let v = unsafe_vector_to_immutable(v)
         ArrayIndex(~store: v)
 
@@ -92,12 +90,16 @@ class ArrayIndex(~store: store :: ImmutableArray && Array.of(Int)):
     store[i]
 
   override indices() :~ Sequence:
-    store
+    0 .. store.length()
 
   override size() :~ NonnegInt:
     store.length()
 
   override compose(j :: Index) :: Index:
+    unless j.sort == #'integer
+    | throw IndexExn("cannot compose non #'integer sort index with " ++ \
+                     "identity index",
+                     Continuation.current_marks())
     let v:
       for Array:
         each idx: store

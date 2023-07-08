@@ -1,0 +1,94 @@
+#lang rhombus/static/and_meta
+
+import:
+  "index.rhm" open
+  "series.rhm" open
+
+export:
+  Dataframe
+
+class Dataframe(~index: index :: Index, ~columns: columns :: List.of(Series)):
+  property num_rows: index.size()
+  property num_cols: columns.length()
+
+  method column_ref(name :: Symbol) :~ Series:
+    for values(found = #false):
+      each series: columns
+      keep_when series.name == name
+      final_when series.name == name
+      series.push_index(index)
+
+  //method add_columns
+  //method remove_columns
+
+expr.macro 'array_grow($(arr :: Identifier), $size)':
+  '$arr := block:
+     let new = Array.make($size, #false)
+     Array.copy_from(new, 0, $arr)
+     new'
+
+reducer.macro 'Dataframe($(series_names :: Identifier), ...)':
+  def [series_arr, ...]:
+    for List:
+      each n: [series_names, ...]
+      Syntax.make_temp_id(n)
+  def [res_names, ...]:
+    for List:
+      each n: [series_names, ...]
+      Syntax.make_temp_id(n)
+  reducer_meta.pack('build_dfb',
+                    '(count = 0, space = 256)',
+                    'step_dfb',
+                    #false,
+                    #false,
+                    'step_result_dfb',
+                    '()',
+                    '[count,
+                      space,
+                      [$series_names, ...],
+                      [$series_arr, ...],
+                      [$res_names, ...]]')
+
+expr.macro 'build_dfb [$count,
+                       $space,
+                       [$series_names, ...],
+                       [$series_arr, ...],
+                       $res_names] $e':
+  def [series_vars, ...]:
+    for List:
+      each n: [series_names, ...]
+      Syntax.make_temp_id(n)
+  'block:
+     let mutable $series_arr :~ Array = Array.make(256, #false)
+     ...
+     let values(count, space) = $e
+     let index = IdentityIndex(~size: count)
+     let $series_vars:
+       Series(~name: #'$series_names, ~index: index, ~store: $series_arr)
+     ...
+     Dataframe(~index: index, ~columns: [$series_vars, ...])'
+
+defn.macro 'step_dfb [$count,
+                      $space,
+                      $series_names,
+                      $series_arr,
+                      [$res_names, ...]] $e':
+  'def values($res_names, ...) = $e'
+
+expr.macro 'step_result_dfb [$count,
+                             $space,
+                             $series_names,
+                             [$series_arr, ...],
+                             [$res_names, ...]]':
+  'block:
+     let nspace:
+       match $space
+       | 0: let new_space = $count / 2
+            let new_size = new_space * 3
+            array_grow($series_arr, new_size)
+            ...
+            new_space
+       | _: $space
+     $series_arr[$count] := $res_names
+     ...
+     values($count + 1, $space - 1)'
