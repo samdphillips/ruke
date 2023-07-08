@@ -28,21 +28,23 @@ expr.macro 'array_grow($(arr :: Identifier), $size)':
      new'
 
 reducer.macro 'Dataframe($(series_names :: Identifier), ...)':
-  def [series_arr, ...]:
+  let [series_arr, ...]:
     for List:
       each n: [series_names, ...]
       Syntax.make_temp_id(n)
-  def [res_names, ...]:
+  let [res_names, ...]:
     for List:
       each n: [series_names, ...]
       Syntax.make_temp_id(n)
+  let '$(ann :: annot_meta.Parsed)' = 'Dataframe'
+  let values(predicate, df_statinfo) = annot_meta.unpack_predicate(ann)  
   reducer_meta.pack('build_dfb',
                     '(count = 0, space = 256)',
                     'step_dfb',
                     #false,
                     #false,
                     'step_result_dfb',
-                    '()',
+                    df_statinfo,
                     '[count,
                       space,
                       [$series_names, ...],
@@ -54,7 +56,7 @@ expr.macro 'build_dfb [$count,
                        [$series_names, ...],
                        [$series_arr, ...],
                        $res_names] $e':
-  def [series_vars, ...]:
+  let [series_vars, ...]:
     for List:
       each n: [series_names, ...]
       Syntax.make_temp_id(n)
@@ -73,7 +75,7 @@ defn.macro 'step_dfb [$count,
                       $series_names,
                       $series_arr,
                       [$res_names, ...]] $e':
-  'def values($res_names, ...) = $e'
+  'let values($res_names, ...) = $e'
 
 expr.macro 'step_result_dfb [$count,
                              $space,
