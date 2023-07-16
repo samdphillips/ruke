@@ -63,8 +63,8 @@ expr.macro 'build_dfb [$count,
   'block:
      let mutable $series_arr :~ Array = Array.make(256, #false)
      ...
-     let values(count, space) = $e
-     let index = IdentityIndex(~size: count)
+     let values($count, $space) = $e
+     let index = IdentityIndex(~size: $count)
      let $series_vars:
        Series(~name: #'$series_names, ~index: index, ~store: $series_arr)
      ...
@@ -75,7 +75,7 @@ defn.macro 'step_dfb [$count,
                       $series_names,
                       $series_arr,
                       [$res_names, ...]] $e':
-  'let values($res_names, ...) = $e'
+  'def values($res_names, ...) = $e'
 
 expr.macro 'step_result_dfb [$count,
                              $space,
