@@ -1,0 +1,10 @@
+#lang rhombus/static
+
+import "dataframe.rhm" open
+
+let df:
+  for Dataframe(a, b):
+     each i: 0..300
+     values(i, i * 2 + 1)
+
+df
