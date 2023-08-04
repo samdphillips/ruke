@@ -1,25 +1,76 @@
 #lang rhombus/static/and_meta
 
 import:
+  lib("racket/sequence.rkt"):
+    rename:
+      #{sequence-map} as map
   "index.rhm" open
   "series.rhm" open
 
 export:
   Dataframe
+  RowView
 
-class Dataframe(~index: index :: Index, ~columns: columns :: List.of(Series)):
-  property num_rows: index.size()
-  property num_cols: columns.length()
+class.together:
+  class RowView(df :: Dataframe, i :: NonnegInt):
+    private implements Indexable
+    private implements Printable
 
-  method column_ref(name :: Symbol) :~ Series:
-    for values(found = #false):
-      each series: columns
-      keep_when series.name == name
-      final_when series.name == name
-      series.push_index(index)
+    private override method get(name :: Symbol):
+      df.column_ref(name)[i]
 
-  //method add_columns
-  //method remove_columns
+    private override method describe(mode, recur):
+      let blocks:
+        for List:
+          each c: df.columns
+          let name = c.name
+          PrintDesc.block(recur(name, mode), recur(get(name), mode))
+      PrintDesc.list("RowView(", blocks, ")")
+
+
+  class Dataframe(~index: index :: Index, ~columns: columns :: List.of(Series)):
+    private implements Indexable
+    implements Sequenceable
+
+    property num_rows: index.size()
+    property num_cols: columns.length()
+
+    method column_names():
+      for List:
+        each series: columns
+        series.name
+
+    method column_ref(name :: Symbol) :~ Series:
+      for values(found = #false):
+        each series: columns
+        keep_when series.name == name
+        final_when series.name == name
+        series.push_index(index)
+
+    method row_ref(i :: NonnegInt) :: RowView:
+      RowView(this, index[i])
+
+    private override method get(i :: NonnegInt) :~ RowView:
+      row_ref(i)
+
+    override method to_sequence():
+      sequence.map(fun (i): get(i), 0..num_rows)
+
+    sequence '$lhs: $rhs':
+      '(~outer_binds:
+          df :~ Dataframe = $rhs
+          nr = df.num_rows,
+        ~recur_binds:
+          i = 0,
+        ~head_guard:
+          i < nr,
+        ~inner_binds:
+          $lhs = df[i],
+        ~recur_args:
+          (i + 1))'
+
+    //method add_columns
+    //method remove_columns
 
 expr.macro 'array_grow($(arr :: Identifier), $size)':
   '$arr := block:
